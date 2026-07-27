@@ -8,6 +8,11 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
@@ -21,7 +26,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 1. O ESCUDO QUE DERRUBOU SEU TESTE (Agora desativado)
+            // 1. ATIVA O CORS (O Passe Livre do React) e desativa o CSRF
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable) 
             
             // 2. Avisa que não vamos usar sessão, apenas o Token JWT
@@ -29,22 +35,38 @@ public class SecurityConfig {
             
             // 3. Nossas regras de rotas
             .authorizeHttpRequests(auth -> auth
-                // Rotas Abertas (Cadastro e Login)
                 .requestMatchers(HttpMethod.POST, "/usuarios").permitAll() 
                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() 
                 
-                // Rotas do próprio usuário (Basta ter o token)
                 .requestMatchers("/usuarios/meus-dados").authenticated()
                 
-                // Rotas EXCLUSIVAS para ADMIN
                 .requestMatchers("/usuarios/**").hasRole("ADMIN") 
                 
-                // Qualquer outra coisa -> Exige token
                 .anyRequest().authenticated()
             )
             // 4. Coloca o nosso Filtro de JWT na frente da porta
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // 5. AS REGRAS DO PASSE LIVRE: Dizendo exatamente quem pode acessar o backend
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // Libera o endereço exato do seu React
+        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        
+        // Libera os métodos que o React vai poder usar
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // Libera o envio de cabeçalhos (como o nosso Authorization: Bearer)
+        configuration.setAllowedHeaders(List.of("*"));
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        
+        return source;
     }
 }
