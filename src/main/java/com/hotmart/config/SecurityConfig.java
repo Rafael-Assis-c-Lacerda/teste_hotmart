@@ -26,43 +26,35 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 1. ATIVA O CORS (O Passe Livre do React) e desativa o CSRF
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable) 
-            
-            // 2. Avisa que não vamos usar sessão, apenas o Token JWT
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) 
-            
-            // 3. Nossas regras de rotas
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/usuarios").permitAll() 
-                .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() 
+                
+                // MUDANÇA AQUI: Libera a pasta /auth/ inteira (Login, Refresh e OPTIONS do CORS)
+                .requestMatchers("/auth/**").permitAll() 
                 
                 .requestMatchers("/usuarios/meus-dados").authenticated()
-                
                 .requestMatchers("/usuarios/**").hasRole("ADMIN") 
                 
                 .anyRequest().authenticated()
             )
-            // 4. Coloca o nosso Filtro de JWT na frente da porta
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // 5. AS REGRAS DO PASSE LIVRE: Dizendo exatamente quem pode acessar o backend
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Libera o endereço exato do seu React
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
-        
-        // Libera os métodos que o React vai poder usar
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        
-        // Libera o envio de cabeçalhos (como o nosso Authorization: Bearer)
         configuration.setAllowedHeaders(List.of("*"));
+        
+        // Permite que o frontend envie e receba o Cookie HttpOnly
+        configuration.setAllowCredentials(true); 
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

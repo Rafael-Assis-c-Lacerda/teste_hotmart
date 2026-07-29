@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom' // <-- Adicione o useNavigate aqui
+import { Link, useNavigate } from 'react-router-dom'
 
 function Login() {
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
-  const navigate = useNavigate(); // <-- Inicialize ele aqui
+  const navigate = useNavigate();
 
   const fazerLogin = async (e) => {
     e.preventDefault();
@@ -13,20 +13,20 @@ function Login() {
       const resposta = await fetch('http://localhost:8080/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // ESSENCIAL: Permite receber o cookie HttpOnly
         body: JSON.stringify({ login, senha })
       });
 
       if (resposta.ok) {
         const dados = await resposta.json();
+        // Salva apenas o Access Token de vida curta no navegador
         localStorage.setItem('meu_token_jwt', dados.token);
         
-        // APAGUE O ALERT E COLOQUE ISSO:
-        navigate('/perfil'); // Joga o usuário direto pro perfil!
-        
+        // Redireciona para o perfil
+        navigate('/perfil');
       } else {
         alert('Falha no login! Credenciais incorretas.');
       }
-// ... resto do código continua igual ...cd
     } catch (erro) {
       console.error("Erro ao conectar com o servidor:", erro);
     }

@@ -7,53 +7,77 @@ function Perfil() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Essa função roda automaticamente assim que o usuário entra na tela
     const buscarMeusDados = async () => {
-      // 1. Pega o crachá do cofre
-      const token = localStorage.getItem('meu_token_jwt');
+      let token = localStorage.getItem('meu_token_jwt');
 
-      // 2. Se não tiver crachá, chuta o cara de volta pro Login na hora
       if (!token) {
         navigate('/login');
         return;
       }
 
       try {
-        // 3. Bate na porta do Spring Boot mostrando o crachá!
-        const resposta = await fetch('http://localhost:8080/usuarios/meus-dados', {
+        // 1. Primeira tentativa com o Access Token atual
+        let resposta = await fetch('http://localhost:8080/usuarios/meus-dados', {
           method: 'GET',
-          headers: { 
-            'Authorization': 'Bearer ' + token 
-          }
+          headers: { 'Authorization': 'Bearer ' + token },
+          credentials: 'include' // Envia os cookies se necessário
         });
 
+        // 2. Se o Access Token venceu (Erro 401 ou 403)
+        if (resposta.status === 403 || resposta.status === 401) {
+          console.log("Access Token expirado! Tentando renovação invisível...");
+          
+          // Tenta renovar batendo na rota de refresh
+         const refreshResposta = await fetch('http://localhost:8080/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }, // <-- ADICIONE ESTA LINHA
+            credentials: 'include' 
+          });
+
+          if (refreshResposta.ok) {
+            // Sucesso na renovação!
+            const dadosRefresh = await refreshResposta.json();
+            token = dadosRefresh.token; 
+            localStorage.setItem('meu_token_jwt', token);
+            
+            // Refaz a chamada para os dados do usuário com o NOVO token
+            resposta = await fetch('http://localhost:8080/usuarios/meus-dados', {
+              method: 'GET',
+              headers: { 'Authorization': 'Bearer ' + token },
+              credentials: 'include'
+            });
+          } else {
+            // Se o Refresh Token também expirou, chuta pro login
+            setErro('Sessão expirada. Faça login novamente.');
+            localStorage.removeItem('meu_token_jwt');
+            return;
+          }
+        }
+
+        // 3. Exibe os dados se tudo deu certo
         if (resposta.ok) {
           const dados = await resposta.json();
-          setUsuario(dados); // Guarda os dados do Java na memória do React
+          setUsuario(dados);
         } else {
-          // Se o token for inválido ou expirado (Status 403)
-          setErro('Sessão expirada. Faça login novamente.');
-          localStorage.removeItem('meu_token_jwt'); // Joga fora o token velho
+          setErro('Erro ao carregar seus dados.');
         }
+
       } catch (erro) {
-        setErro('Erro ao conectar com o servidor.');
+        setErro('Erro crítico ao conectar com o servidor.');
       }
     }
 
     buscarMeusDados();
   }, [navigate])
 
-  // Função para deslogar (apagar o token)
   const sairDaConta = () => {
     localStorage.removeItem('meu_token_jwt');
     navigate('/login');
   }
 
-  // Telas de carregamento ou erro
   if (erro) return <div style={{ padding: '50px' }}><h3>{erro}</h3><button onClick={() => navigate('/login')}>Voltar</button></div>;
   if (!usuario) return <div style={{ padding: '50px' }}>Carregando seus dados...</div>;
 
-  // A tela principal com os dados do banco!
   return (
     <div style={{ padding: '50px', fontFamily: 'Arial' }}>
       <h2>Bem-vindo(a), {usuario.nome}!</h2>
