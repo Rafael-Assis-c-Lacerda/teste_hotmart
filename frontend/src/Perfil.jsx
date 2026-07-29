@@ -30,7 +30,7 @@ function Perfil() {
           // Tenta renovar batendo na rota de refresh
          const refreshResposta = await fetch('http://localhost:8080/auth/refresh', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }, // <-- ADICIONE ESTA LINHA
+            headers: { 'Content-Type': 'application/json' }, 
             credentials: 'include' 
           });
 
@@ -70,9 +70,24 @@ function Perfil() {
     buscarMeusDados();
   }, [navigate])
 
-  const sairDaConta = () => {
-    localStorage.removeItem('meu_token_jwt');
-    navigate('/login');
+  // ==========================================
+  // NOVA FUNÇÃO DE SAIR DA CONTA (LOGOUT COMPLETO)
+  // ==========================================
+  const sairDaConta = async () => {
+    try {
+      // 1. Pede pro Java destruir o cookie de renovação invisível
+      await fetch('http://localhost:8080/auth/logout', {
+        method: 'POST',
+        credentials: 'include' // OBRIGATÓRIO: Permite o envio do cookie para ser destruído
+      });
+    } catch (error) {
+      console.error("Erro ao deslogar no backend", error);
+    } finally {
+      // 2. Apaga o crachá rápido do cofre do React
+      localStorage.removeItem('meu_token_jwt');
+      // 3. Manda para a tela de Login
+      navigate('/login');
+    }
   }
 
   if (erro) return <div style={{ padding: '50px' }}><h3>{erro}</h3><button onClick={() => navigate('/login')}>Voltar</button></div>;
